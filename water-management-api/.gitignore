@@ -1,0 +1,41 @@
+# Binarios
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+water-management-api
+cmd/api/api
+cmd/seed/seed
+
+# Test
+*.test
+*.out
+
+# Dependencias
+vendor/
+
+# Go workspace
+go.work
+
+# Environment variables
+.env
+.env.local
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Uploads
+uploads/
+tmp/
