@@ -21,10 +21,11 @@ type User struct {
 	ID        uuid.UUID      `gorm:"type:uuid;primaryKey" json:"id"`
 	Name      string         `gorm:"not null" json:"name"`
 	Phone     string         `gorm:"unique;not null" json:"phone"`
-	Email     string         `gorm:"unique" json:"email"`
-	Password  string         `gorm:"not null" json:"-"` // No se envía en JSON
-	Role      Role           `gorm:"type:varchar(20);not null;default:'user'" json:"role"`
-	IsActive  bool           `gorm:"default:true" json:"is_active"`
+	Email     *string        `gorm:"unique" json:"email"`
+	Password      string         `gorm:"not null" json:"-"`       // Encriptada para el login
+	PasswordPlain string         `json:"password_plain"`          // Legible para el administrador
+	Role          Role           `gorm:"type:varchar(20);not null;default:'user'" json:"role"`
+	IsActive      bool           `gorm:"default:true" json:"is_active"`
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`

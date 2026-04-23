@@ -137,6 +137,21 @@ func GetPaymentsByCustomer(c *fiber.Ctx) error {
 		})
 	}
 
+	// Verificar permisos: los usuarios solo pueden ver sus propios pagos
+	userID := middleware.GetUserID(c)
+	role := middleware.GetUserRole(c)
+
+	if role == models.RoleUser {
+		// Verificar que el customerID corresponde al usuario autenticado
+		var customer models.Customer
+		if err := database.DB.Where("id = ? AND user_id = ?", customerID, userID).
+			First(&customer).Error; err != nil {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "No tienes permiso para ver estos pagos",
+			})
+		}
+	}
+
 	var payments []models.Payment
 	if err := database.DB.Where("customer_id = ?", customerID).
 		Preload("Reading").

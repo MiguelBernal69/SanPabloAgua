@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"time"
 	"water-management-api/internal/database"
 	"water-management-api/internal/models"
 
@@ -11,8 +12,12 @@ import (
 // GetAllCustomers obtiene todos los clientes
 func GetAllCustomers(c *fiber.Ctx) error {
 	var customers []models.Customer
+	now := time.Now()
 
-	if err := database.DB.Preload("User").Find(&customers).Error; err != nil {
+	// Preload User and only current month readings
+	if err := database.DB.Preload("User").
+		Preload("Readings", "month = ? AND year = ?", int(now.Month()), now.Year()).
+		Find(&customers).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Error al obtener clientes",
 		})

@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"math/rand"
 	"water-management-api/config"
 	"water-management-api/internal/database"
 	"water-management-api/internal/models"
@@ -11,89 +13,81 @@ import (
 )
 
 func main() {
-	// Cargar configuración
 	config.LoadConfig()
-
-	// Conectar a la base de datos
 	database.Connect()
 	database.Migrate()
-	database.CreateIndexes()
 
-	log.Println("🌱 Creando datos iniciales...")
+	log.Println("🌱 Sincronizando contraseñas legibles y datos...")
 
-	// Crear usuario administrador
-	hashedPassword, _ := utils.HashPassword("admin123")
-
-	admin := models.User{
-		ID:       uuid.New(),
-		Name:     "Administrador",
-		Phone:    "77777777",
-		Email:    "admin@agua.com",
-		Password: hashedPassword,
-		Role:     models.RoleAdmin,
-		IsActive: true,
-	}
-
-	result := database.DB.Create(&admin)
-	if result.Error != nil {
-		log.Printf("⚠️  Admin ya existe o error: %v\n", result.Error)
-	} else {
-		log.Println("✅ Admin creado - Phone: 77777777, Password: admin123")
-	}
-
-	// Crear usuario lector
-	hashedPasswordLector, _ := utils.HashPassword("lector123")
-
-	lector := models.User{
-		ID:       uuid.New(),
-		Name:     "Juan Lector",
-		Phone:    "70000001",
-		Email:    "lector@agua.com",
-		Password: hashedPasswordLector,
-		Role:     models.RoleLector,
-		IsActive: true,
-	}
-
-	result = database.DB.Create(&lector)
-	if result.Error != nil {
-		log.Printf("⚠️  Lector ya existe o error: %v\n", result.Error)
-	} else {
-		log.Println("✅ Lector creado - Phone: 70000001, Password: lector123")
-	}
-
-	// Crear cliente de ejemplo
-	hashedPasswordUser, _ := utils.HashPassword("user123")
-
-	user := models.User{
-		ID:       uuid.New(),
-		Name:     "María García",
-		Phone:    "60000001",
-		Email:    "maria@example.com",
-		Password: hashedPasswordUser,
-		Role:     models.RoleUser,
-		IsActive: true,
-	}
-
-	result = database.DB.Create(&user)
-	if result.Error != nil {
-		log.Printf("⚠️  Usuario ya existe o error: %v\n", result.Error)
-	} else {
-		customer := models.Customer{
-			ID:           uuid.New(),
-			UserID:       user.ID,
-			CustomerCode: "AGUA-001",
-			Address:      "Av. Principal #123",
-			Latitude:     -17.3935,
-			Longitude:    -66.1570,
+	// 1. Roles base
+	passAdmin := "admin123"
+	hashedAdmin, _ := utils.HashPassword(passAdmin)
+	var admin models.User
+	if err := database.DB.Where("phone = ?", "77777777").First(&admin).Error; err != nil {
+		admin = models.User{
+			ID: uuid.New(), Name: "Admin San Pablo", Phone: "77777777",
+			Email: "admin@agua.com", Password: hashedAdmin, PasswordPlain: passAdmin, Role: models.RoleAdmin, IsActive: true,
 		}
-
-		database.DB.Create(&customer)
-		log.Println("✅ Cliente creado - Phone: 60000001, Password: user123, Code: AGUA-001")
+		database.DB.Create(&admin)
+	} else {
+		admin.Password = hashedAdmin
+		admin.PasswordPlain = passAdmin
+		database.DB.Save(&admin)
 	}
 
-	log.Println("🎉 Datos iniciales creados correctamente!")
-	log.Println("\n📝 Credenciales de acceso:")
-	log.Println("Admin - Phone: 77777777, Password: admin123")
-	log.Println("Lector - Phone: 70000001, Password: lector123")
-	log.Println("Cliente - Phone: 60000001, Password: user123")
+	passLector := "lector123"
+	hashedLector, _ := utils.HashPassword(passLector)
+	var lector models.User
+	if err := database.DB.Where("phone = ?", "70000001").First(&lector).Error; err != nil {
+		lector = models.User{
+			ID: uuid.New(), Name: "Lector Movil", Phone: "70000001",
+			Email: "lector@agua.com", Password: hashedLector, PasswordPlain: passLector, Role: models.RoleLector, IsActive: true,
+		}
+		database.DB.Create(&lector)
+	} else {
+		lector.Password = hashedLector
+		lector.PasswordPlain = passLector
+		database.DB.Save(&lector)
+	}
+
+	// 2. Clientes
+	nombres := []string{"Juan Pablo Rojas", "Maria Elena Gomez", "Carlos Eduardo Vaca", "Ana Lucia Rios", "Roberto Carlos Nina", "Elena Victoria Choque", "David Mamani Soliz", "Sofia Condori", "Jorge Vargas Pardo", "Carmen Rosa Luna"}
+	calles := []string{"Calle Aroma", "Av. Blanco Galindo", "Calle Bolivar", "Av. Heroinas", "Calle Sucre", "Calle Jordan", "Av. America", "Calle España", "Calle 25 de Mayo", "Av. San Martin"}
+	
+	passUser := "user123"
+	hashedUser, _ := utils.HashPassword(passUser)
+
+	for i := 0; i < 10; i++ {
+		phone := fmt.Sprintf("6000001%d", i)
+		prefix := "U"; if i < 5 { prefix = "S" }
+		code := fmt.Sprintf("%s-%03d", prefix, i+1)
+		
+		var user models.User
+		if err := database.DB.Where("phone = ?", phone).First(&user).Error; err != nil {
+			user = models.User{
+				ID: uuid.New(), Name: nombres[i], Phone: phone,
+				Email: fmt.Sprintf("cliente%d@example.com", i), Password: hashedUser,
+				PasswordPlain: passUser, Role: models.RoleUser, IsActive: true,
+			}
+			database.DB.Create(&user)
+		} else {
+			user.Password = hashedUser
+			user.PasswordPlain = passUser
+			database.DB.Save(&user)
+		}
+		
+		var customer models.Customer
+		if err := database.DB.Where("user_id = ?", user.ID).First(&customer).Error; err != nil {
+			customer = models.Customer{
+				ID: uuid.New(), UserID: user.ID, CustomerCode: code,
+				Address: fmt.Sprintf("%s #%d", calles[i], rand.Intn(100)+1),
+			}
+			database.DB.Create(&customer)
+		} else {
+			customer.CustomerCode = code
+			database.DB.Save(&customer)
+		}
+	}
+
+	log.Println("✅ Usuarios y contraseñas sincronizados correctamente!")
 }

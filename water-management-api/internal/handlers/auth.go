@@ -37,9 +37,9 @@ func Login(c *fiber.Ctx) error {
 		})
 	}
 
-	// Buscar usuario por teléfono
+	// Buscar usuario por teléfono con sus datos de cliente
 	var user models.User
-	result := database.DB.Where("phone = ? AND is_active = ?", req.Phone, true).First(&user)
+	result := database.DB.Preload("Customer").Where("phone = ? AND is_active = ?", req.Phone, true).First(&user)
 	if result.Error != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Credenciales inválidas",
@@ -110,7 +110,8 @@ func UpdateCurrentUser(c *fiber.Ctx) error {
 		user.Name = updateData.Name
 	}
 	if updateData.Email != "" {
-		user.Email = updateData.Email
+		emailStr := updateData.Email
+		user.Email = &emailStr
 	}
 	if updateData.Phone != "" {
 		user.Phone = updateData.Phone
@@ -161,19 +162,47 @@ func CreateUser(c *fiber.Ctx) error {
 		})
 	}
 
+	// Verificar si ya existe un usuario con ese teléfono o email
+	var existingUser models.User
+	query := database.DB.Where("phone = ?", req.Phone)
+	if req.Email != "" {
+		query = query.Or("email = ?", req.Email)
+	}
+	
+	if err := query.First(&existingUser).Error; err == nil {
+		if existingUser.Phone == req.Phone {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+				"error": "El número de teléfono ya está registrado",
+			})
+		}
+		if req.Email != "" && existingUser.Email != nil && *existingUser.Email == req.Email {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+				"error": "El correo electrónico ya está registrado",
+			})
+		}
+	}
+
+	// Procesar email como puntero (vacio = null)
+	var emailPtr *string
+	if req.Email != "" {
+		emailStr := req.Email
+		emailPtr = &emailStr
+	}
+
 	// Crear usuario
 	user := models.User{
-		Name:     req.Name,
-		Phone:    req.Phone,
-		Email:    req.Email,
-		Password: hashedPassword,
-		Role:     req.Role,
-		IsActive: true,
+		Name:          req.Name,
+		Phone:         req.Phone,
+		Email:         emailPtr,
+		Password:      hashedPassword,
+		PasswordPlain: req.Password,
+		Role:          req.Role,
+		IsActive:      true,
 	}
 
 	if err := database.DB.Create(&user).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Error al crear usuario (posiblemente teléfono duplicado)",
+			"error": "Error al crear usuario en la base de datos",
 		})
 	}
 
@@ -252,6 +281,7 @@ func UpdateUser(c *fiber.Ctx) error {
 		Name     string `json:"name"`
 		Email    string `json:"email"`
 		Phone    string `json:"phone"`
+		Password string `json:"password"`
 		IsActive *bool  `json:"is_active"`
 	}
 
@@ -268,23 +298,38 @@ func UpdateUser(c *fiber.Ctx) error {
 		})
 	}
 
-	// Actualizar campos
+	// Mapear cambios para actualización (solo si no están vacíos)
+	updates := map[string]interface{}{}
+	
 	if updateData.Name != "" {
-		user.Name = updateData.Name
+		updates["name"] = updateData.Name
 	}
 	if updateData.Email != "" {
-		user.Email = updateData.Email
+		emailStr := updateData.Email
+		updates["email"] = &emailStr
 	}
 	if updateData.Phone != "" {
-		user.Phone = updateData.Phone
+		updates["phone"] = updateData.Phone
 	}
 	if updateData.IsActive != nil {
-		user.IsActive = *updateData.IsActive
+		updates["is_active"] = *updateData.IsActive
 	}
 
-	if err := database.DB.Save(&user).Error; err != nil {
+	// Solo actualizar contraseña si se ha escrito algo nuevo
+	if updateData.Password != "" {
+		hashedPassword, err := utils.HashPassword(updateData.Password)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Error al procesar la nueva contraseña",
+			})
+		}
+		updates["password"] = hashedPassword
+		updates["password_plain"] = updateData.Password
+	}
+
+	if err := database.DB.Model(&user).Updates(updates).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Error al actualizar usuario",
+			"error": "Error al actualizar usuario en la base de datos",
 		})
 	}
 

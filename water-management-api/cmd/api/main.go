@@ -37,6 +37,9 @@ func main() {
 		AllowMethods: "GET, POST, PUT, DELETE, PATCH",
 	}))
 
+	// Servir archivos estáticos (fotos de casas)
+	app.Static("/uploads", "./uploads")
+
 	// Rutas públicas
 	api := app.Group("/api/v1")
 
@@ -61,21 +64,25 @@ func main() {
 	admin.Put("/users/:id", handlers.UpdateUser)
 	admin.Delete("/users/:id", handlers.DeleteUser)
 
-	// Lecturas (Lectores y Admins)
+	// Lecturas
 	readings := api.Group("/readings")
 	readings.Use(middleware.AuthMiddleware)
 	readings.Post("/", middleware.RoleMiddleware(models.RoleLector, models.RoleAdmin), handlers.CreateReading)
-	readings.Get("/", handlers.GetReadings)
+	readings.Get("/", middleware.RoleMiddleware(models.RoleAdmin, models.RoleLector), handlers.GetReadings)
 	readings.Get("/:id", handlers.GetReadingByID)
-	readings.Get("/customer/:customer_id", handlers.GetReadingsByCustomer)
+	readings.Get("/customer/:customer_id", handlers.GetReadingsByCustomer) // Todos los roles autenticados
 
-	// Pagos (Solo Admins)
+	// Pagos
 	payments := api.Group("/payments")
 	payments.Use(middleware.AuthMiddleware)
-	payments.Use(middleware.RoleMiddleware(models.RoleAdmin))
-	payments.Post("/", handlers.CreatePayment)
-	payments.Get("/", handlers.GetPayments)
+	// Ruta pública para que el usuario vea sus propios pagos
 	payments.Get("/customer/:customer_id", handlers.GetPaymentsByCustomer)
+	
+	// Rutas solo para Admin
+	paymentsAdmin := payments.Group("/")
+	paymentsAdmin.Use(middleware.RoleMiddleware(models.RoleAdmin))
+	paymentsAdmin.Post("/", handlers.CreatePayment)
+	paymentsAdmin.Get("/", handlers.GetPayments)
 
 	// Clientes
 	customers := api.Group("/customers")
@@ -83,6 +90,7 @@ func main() {
 	customers.Get("/", middleware.RoleMiddleware(models.RoleAdmin, models.RoleLector), handlers.GetAllCustomers)
 	customers.Get("/:id", handlers.GetCustomerByID)
 	customers.Put("/:id", middleware.RoleMiddleware(models.RoleAdmin, models.RoleLector), handlers.UpdateCustomer)
+	customers.Post("/:id/photo", middleware.RoleMiddleware(models.RoleAdmin, models.RoleLector), handlers.UploadCustomerPhoto)
 
 	// Reportes (Solo Admins)
 	reports := api.Group("/reports")

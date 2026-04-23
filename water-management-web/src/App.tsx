@@ -8,6 +8,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminReadings from './pages/admin/AdminReadings';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminReports from './pages/admin/AdminReports';
+import AdminLectores from './pages/admin/AdminLectores';
 import UserDashboard from './pages/user/UserDashboard';
 import UserPayments from './pages/user/UserPayments';
 import DashboardLayout from './components/layout/DashboardLayout';
@@ -65,6 +66,16 @@ const App: React.FC = () => {
               <ProtectedRoute roles={['admin']}>
                 <DashboardLayout>
                   <AdminReports />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/lectores" 
+            element={
+              <ProtectedRoute roles={['admin']}>
+                <DashboardLayout>
+                  <AdminLectores />
                 </DashboardLayout>
               </ProtectedRoute>
             } 

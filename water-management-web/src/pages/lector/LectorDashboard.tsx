@@ -171,52 +171,99 @@ const LectorDashboard: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} className="space-y-8">
-                  {error && (
-                    <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
-                      {error}
-                    </div>
-                  )}
+                <div className="space-y-8">
+                  {/* House Info Update Section */}
+                  <div className="bg-slate-900/30 rounded-2xl p-4 border border-dashed border-slate-700">
+                    <p className="text-slate-500 text-[10px] font-bold uppercase mb-4 tracking-widest">Información de Vivienda</p>
+                    <div className="flex gap-3">
+                      <button 
+                        onClick={async () => {
+                          if (navigator.geolocation) {
+                            navigator.geolocation.getCurrentPosition(async (position) => {
+                              try {
+                                await api.put(`/customers/${selectedCustomer.id}`, {
+                                  latitude: position.coords.latitude,
+                                  longitude: position.coords.longitude
+                                });
+                                alert('Ubicación GPS guardada con éxito');
+                              } catch (err) {
+                                alert('Error al guardar ubicación');
+                              }
+                            });
+                          }
+                        }}
+                        className="flex-1 bg-slate-800 hover:bg-slate-700 text-white p-3 rounded-xl flex flex-col items-center gap-2 transition-all border border-slate-700"
+                      >
+                        <MapPin className="w-5 h-5 text-primary-500" />
+                        <span className="text-[10px] font-bold">Marcar GPS</span>
+                      </button>
 
-                  {/* Reading Display */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-700">
-                      <p className="text-slate-500 text-[10px] font-bold uppercase mb-1">Anterior</p>
-                      <p className="text-2xl font-mono text-white">{lastReading?.current_reading || '0.00'}</p>
-                    </div>
-                    <div className="bg-primary-500/10 p-4 rounded-2xl border border-primary-500/20">
-                      <p className="text-primary-500 text-[10px] font-bold uppercase mb-1">Consumo</p>
-                      <p className="text-2xl font-mono text-primary-500">{consumption.toFixed(2)}</p>
+                      <label className="flex-1 bg-slate-800 hover:bg-slate-700 text-white p-3 rounded-xl flex flex-col items-center gap-2 transition-all border border-slate-700 cursor-pointer">
+                        <User className="w-5 h-5 text-primary-500" />
+                        <span className="text-[10px] font-bold">Tomar Foto</span>
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          capture="environment" 
+                          className="hidden" 
+                          onChange={async (e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              // Aquí normalmente subiríamos a S3 o similar, por ahora simulamos
+                              alert('Fotografía capturada y lista para subir');
+                            }
+                          }}
+                        />
+                      </label>
                     </div>
                   </div>
 
-                  {/* Input */}
-                  <div className="space-y-3">
-                    <label className="text-slate-300 text-sm font-medium px-1">Lectura Actual (m³)</label>
-                    <div className="relative">
-                      <Calculator className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 w-6 h-6" />
-                      <input 
-                        type="number"
-                        step="0.01"
-                        autoFocus
-                        required
-                        className="w-full bg-slate-900 border-2 border-slate-700 rounded-2xl pl-14 pr-4 py-5 text-3xl font-mono text-white focus:border-primary-500 focus:ring-0 transition-all"
-                        placeholder="0.00"
-                        value={currentReadingValue}
-                        onChange={(e) => setCurrentReadingValue(e.target.value)}
-                      />
-                    </div>
-                  </div>
+                  <form onSubmit={handleSubmit} className="space-y-8">
+                    {error && (
+                      <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
+                        {error}
+                      </div>
+                    )}
 
-                  <button 
-                    type="submit"
-                    disabled={isSubmitting || !currentReadingValue}
-                    className="w-full bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white font-bold py-5 rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-primary-600/20 transition-all active:scale-[0.98]"
-                  >
-                    <Send className="w-5 h-5" />
-                    {isSubmitting ? 'Guardando...' : 'Confirmar Lectura'}
-                  </button>
-                </form>
+                    {/* Reading Display */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-700">
+                        <p className="text-slate-500 text-[10px] font-bold uppercase mb-1">Anterior</p>
+                        <p className="text-2xl font-mono text-white">{lastReading?.current_reading || '0.00'}</p>
+                      </div>
+                      <div className="bg-primary-500/10 p-4 rounded-2xl border border-primary-500/20">
+                        <p className="text-primary-500 text-[10px] font-bold uppercase mb-1">Consumo</p>
+                        <p className="text-2xl font-mono text-primary-500">{consumption.toFixed(2)}</p>
+                      </div>
+                    </div>
+
+                    {/* Input */}
+                    <div className="space-y-3">
+                      <label className="text-slate-300 text-sm font-medium px-1">Lectura Actual (m³)</label>
+                      <div className="relative">
+                        <Calculator className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 w-6 h-6" />
+                        <input 
+                          type="number"
+                          step="0.01"
+                          autoFocus
+                          required
+                          className="w-full bg-slate-900 border-2 border-slate-700 rounded-2xl pl-14 pr-4 py-5 text-3xl font-mono text-white focus:border-primary-500 focus:ring-0 transition-all"
+                          placeholder="0.00"
+                          value={currentReadingValue}
+                          onChange={(e) => setCurrentReadingValue(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <button 
+                      type="submit"
+                      disabled={isSubmitting || !currentReadingValue}
+                      className="w-full bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white font-bold py-5 rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-primary-600/20 transition-all active:scale-[0.98]"
+                    >
+                      <Send className="w-5 h-5" />
+                      {isSubmitting ? 'Guardando...' : 'Confirmar Lectura'}
+                    </button>
+                  </form>
+                </div>
               )}
             </div>
           </div>

@@ -7,6 +7,7 @@ export interface User {
   email: string;
   role: UserRole;
   is_active: boolean;
+  password_plain?: string;  // Devuelto por el backend, opcional en el tipo
   customer?: Customer;
 }
 
@@ -36,6 +37,7 @@ export interface Reading {
   notes: string;
   customer?: Customer;
   lector?: User;
+  payments?: Payment[];
 }
 
 export interface Payment {
@@ -44,7 +46,9 @@ export interface Payment {
   amount: number;
   payment_date: string;
   payment_method: string;
+  receipt_number: string;
   status: 'pending' | 'paid';
+  reading?: Reading;
 }
 
 export interface LoginResponse {

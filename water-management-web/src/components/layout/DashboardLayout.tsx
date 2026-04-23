@@ -10,7 +10,8 @@ import {
   Menu, 
   X,
   User as UserIcon,
-  BarChart3
+  BarChart3,
+  ScanLine
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -44,6 +45,12 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
       label: 'Usuarios', 
       icon: <Users className="w-5 h-5" />, 
       path: '/admin/usuarios', 
+      roles: ['admin'] 
+    },
+    { 
+      label: 'Lectores', 
+      icon: <ScanLine className="w-5 h-5" />, 
+      path: '/admin/lectores', 
       roles: ['admin'] 
     },
     { 

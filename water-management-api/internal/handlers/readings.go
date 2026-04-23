@@ -135,6 +135,8 @@ func GetReadings(c *fiber.Ctx) error {
 	month := c.Query("month")
 	year := c.Query("year")
 	isPaid := c.Query("is_paid")
+	startDate := c.Query("start_date")
+	endDate := c.Query("end_date")
 
 	if month != "" {
 		query = query.Where("month = ?", month)
@@ -144,6 +146,9 @@ func GetReadings(c *fiber.Ctx) error {
 	}
 	if isPaid != "" {
 		query = query.Where("is_paid = ?", isPaid == "true")
+	}
+	if startDate != "" && endDate != "" {
+		query = query.Where("reading_date BETWEEN ? AND ?", startDate, endDate)
 	}
 
 	if err := query.Order("year DESC, month DESC").Find(&readings).Error; err != nil {
