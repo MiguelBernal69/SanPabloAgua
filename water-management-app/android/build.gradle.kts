@@ -22,3 +22,37 @@ subprojects {
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
+
+subprojects {
+    val fixNamespace = {
+        if (project.hasProperty("android")) {
+            val android = project.extensions.findByName("android")
+            if (android != null) {
+                try {
+                    val getNamespace = android.javaClass.getMethod("getNamespace")
+                    val setNamespace = android.javaClass.getMethod("setNamespace", String::class.java)
+                    if (getNamespace.invoke(android) == null) {
+                        setNamespace.invoke(android, "com.fix.namespace." + project.name.replace("-", "_"))
+                    }
+                } catch (e: Exception) {
+                }
+            }
+        }
+    }
+
+    if (project.state.executed) {
+        fixNamespace()
+    } else {
+        project.afterEvaluate { fixNamespace() }
+    }
+}
+
+
+
+
+
+
+
+
+
+

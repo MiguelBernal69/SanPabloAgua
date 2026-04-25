@@ -44,6 +44,8 @@ dependencies:
   geolocator: ^10.1.0
   cached_network_image: ^3.3.0
   http_parser: ^4.0.0
+  blue_thermal_printer: ^1.2.3
+  permission_handler: ^11.3.1
 
 dev_dependencies:
   flutter_test:
