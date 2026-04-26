@@ -108,7 +108,7 @@ class ApiService {
       }),
     );
 
-    if (response.statusCode != 201) {
+    if (response.statusCode != 201 && response.statusCode != 200) {
       throw Exception(
         jsonDecode(response.body)['error'] ?? 'Error al registrar lectura',
       );

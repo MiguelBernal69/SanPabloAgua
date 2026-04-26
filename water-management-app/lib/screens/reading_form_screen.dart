@@ -27,6 +27,16 @@ class _ReadingFormScreenState extends State<ReadingFormScreen> {
   bool _isSaved = false;
   String _printStatus = "";
   double _calculatedConsumption = 0;
+  
+  // Detalle de cobro
+  double _baseCost = 37.0;
+  double _excess1Cost = 0;
+  double _excess2Cost = 0;
+  double _totalCost = 37.0;
+  
+  bool _isEditMode = false;
+  String? _existingReadingId;
+  Reading? _actualPreviousReading; // Nueva variable para guardar la lectura real del mes pasado
 
   @override
   void initState() {
@@ -37,12 +47,38 @@ class _ReadingFormScreenState extends State<ReadingFormScreen> {
 
   Future<void> _loadLastReading() async {
     final token = Provider.of<AuthProvider>(context, listen: false).token;
+    final now = DateTime.now();
     try {
-      final reading = await ApiService.getLastReading(widget.customer.id, token!);
-      setState(() {
-        _lastReading = reading;
-        _isLoading = false;
-      });
+      // 1. Obtener el historial de lecturas (vienen ordenadas por fecha desc)
+      final readings = await ApiService.getCustomerReadings(widget.customer.id, token!);
+      
+      if (readings.isNotEmpty) {
+        final newest = readings.first;
+        bool isSameMonth = newest.month == now.month && newest.year == now.year;
+
+        setState(() {
+          if (isSameMonth) {
+            _isEditMode = true;
+            _existingReadingId = newest.id;
+            _readingController.text = newest.currentReading.toString();
+            _notesController.text = newest.notes ?? "";
+            
+            // La lectura anterior real es la SEGUNDA de la lista
+            _actualPreviousReading = readings.length > 1 ? readings[1] : null;
+          } else {
+            _isEditMode = false;
+            _actualPreviousReading = newest;
+          }
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _isEditMode = false;
+          _actualPreviousReading = null;
+          _isLoading = false;
+        });
+      }
+      _updateConsumption();
     } catch (e) {
       setState(() => _isLoading = false);
     }
@@ -50,9 +86,31 @@ class _ReadingFormScreenState extends State<ReadingFormScreen> {
 
   void _updateConsumption() {
     final current = double.tryParse(_readingController.text) ?? 0;
-    final previous = _lastReading?.currentReading ?? 0;
+    
+    final previous = _actualPreviousReading?.currentReading ?? 0;
+    final consumption = current - previous;
+    
+    // Lógica de Cobro San Pablo
+    double base = 37.0;
+    double ex1 = 0;
+    double ex2 = 0;
+    
+    if (consumption > 10) {
+      double excessMts = consumption - 10;
+      if (excessMts <= 15) { // Hasta 25 m3 total (10+15)
+        ex1 = excessMts * 3.0;
+      } else {
+        ex1 = 15 * 3.0; // Los primeros 15 excedentes
+        ex2 = (excessMts - 15) * 8.0; // El resto a 8 Bs
+      }
+    }
+
     setState(() {
-      _calculatedConsumption = current - previous;
+      _calculatedConsumption = consumption;
+      _baseCost = base;
+      _excess1Cost = ex1;
+      _excess2Cost = ex2;
+      _totalCost = base + ex1 + ex2;
     });
   }
 
@@ -63,7 +121,7 @@ class _ReadingFormScreenState extends State<ReadingFormScreen> {
       return;
     }
 
-    if (current < (_lastReading?.currentReading ?? 0)) {
+    if (current < (_actualPreviousReading?.currentReading ?? 0)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('La lectura actual no puede ser menor a la anterior')));
       return;
     }
@@ -73,19 +131,31 @@ class _ReadingFormScreenState extends State<ReadingFormScreen> {
     final now = DateTime.now();
 
     try {
-      await ApiService.createReading(
-        token: token!,
-        customerId: widget.customer.id,
-        currentReading: current,
-        month: now.month,
-        year: now.year,
-        notes: _notesController.text,
-      );
+      if (_isEditMode && _existingReadingId != null) {
+        // Lógica de actualización (Podrías crear un ApiService.updateReading si el backend lo requiere)
+        await ApiService.createReading(
+          token: token!,
+          customerId: widget.customer.id,
+          currentReading: current,
+          month: now.month,
+          year: now.year,
+          notes: _notesController.text,
+        );
+      } else {
+        await ApiService.createReading(
+          token: token!,
+          customerId: widget.customer.id,
+          currentReading: current,
+          month: now.month,
+          year: now.year,
+          notes: _notesController.text,
+        );
+      }
       setState(() {
         _isSaving = false;
         _isSaved = true;
       });
-      _connectToPrinter();
+      _printReceipt();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
@@ -107,13 +177,16 @@ class _ReadingFormScreenState extends State<ReadingFormScreen> {
       await PrintService.printReceipt(
         customerName: widget.customer.userName ?? 'Cliente',
         customerCode: widget.customer.customerCode,
-        previousReading: _lastReading?.currentReading ?? 0,
+        previousReading: _actualPreviousReading?.currentReading ?? 0,
         currentReading: double.parse(_readingController.text),
-        consumption: _calculatedConsumption,
-        totalAmount: _calculatedConsumption * 5.0, // Ejemplo: Bs 5 por m3
+        consumption: double.parse(_readingController.text) - (_actualPreviousReading?.currentReading ?? 0),
+        totalAmount: _totalCost,
+        notes: _notesController.text,
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al imprimir: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al imprimir: $e')));
+      }
     }
   }
 
@@ -202,7 +275,7 @@ class _ReadingFormScreenState extends State<ReadingFormScreen> {
         Text('LECTURA ANTERIOR', style: GoogleFonts.outfit(color: const Color(0xFF64748B), fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
         const SizedBox(height: 10),
         Text(
-          '${_lastReading?.currentReading.toStringAsFixed(1) ?? "0.0"} m³',
+          '${_actualPreviousReading?.currentReading.toStringAsFixed(1) ?? "0.0"} m³',
           style: GoogleFonts.outfit(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 30),
@@ -226,23 +299,30 @@ class _ReadingFormScreenState extends State<ReadingFormScreen> {
         const Divider(color: Colors.blueAccent, thickness: 2),
         
         if (_calculatedConsumption > 0) ...[
-          const SizedBox(height: 10),
-          Text(
-            'CONSUMO CALCULADO: ${_calculatedConsumption.toStringAsFixed(1)} m³',
-            style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 12),
-          ),
+          const SizedBox(height: 20),
+          _buildPriceDetailCard(),
         ],
         const SizedBox(height: 30),
 
         // Notes
-        TextField(
-          controller: _notesController,
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            labelText: 'Notas / Observaciones',
-            labelStyle: const TextStyle(color: Color(0xFF64748B)),
-            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
-            focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.blueAccent)),
+        Container(
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+          ),
+          child: TextField(
+            controller: _notesController,
+            maxLines: 3,
+            style: const TextStyle(color: Colors.white, fontSize: 14),
+            decoration: const InputDecoration(
+              labelText: 'OBSERVACIONES / NOTAS',
+              labelStyle: TextStyle(color: Color(0xFF64748B), fontSize: 12, fontWeight: FontWeight.bold),
+              border: InputBorder.none,
+              hintText: 'Ej. Medidor con fuga, no se pudo ver bien...',
+              hintStyle: TextStyle(color: Color(0xFF334155), fontSize: 14),
+            ),
           ),
         ),
         const SizedBox(height: 50),
@@ -259,10 +339,60 @@ class _ReadingFormScreenState extends State<ReadingFormScreen> {
             ),
             child: _isSaving 
               ? const CircularProgressIndicator(color: Colors.white)
-              : const Text('GUARDAR LECTURA', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+              : Text(
+                  _isEditMode ? 'ACTUALIZAR LECTURA' : 'GUARDAR LECTURA', 
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)
+                ),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildPriceDetailCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('DETALLE DE CONSUMO', style: GoogleFonts.outfit(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 12)),
+              Text('${_calculatedConsumption.toStringAsFixed(1)} m³', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          const Divider(color: Colors.white10, height: 25),
+          _buildPriceRow('Mínimo Base (10 m³)', _baseCost),
+          if (_excess1Cost > 0) _buildPriceRow('Excedente 1 (11-25 m³)', _excess1Cost),
+          if (_excess2Cost > 0) _buildPriceRow('Excedente 2 (>25 m³)', _excess2Cost),
+          const Divider(color: Colors.white10, height: 25),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('TOTAL ESTIMADO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+              Text('Bs. ${_totalCost.toStringAsFixed(2)}', style: GoogleFonts.outfit(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 22)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPriceRow(String label, double price) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
+          Text('Bs. ${price.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontSize: 13)),
+        ],
+      ),
     );
   }
 

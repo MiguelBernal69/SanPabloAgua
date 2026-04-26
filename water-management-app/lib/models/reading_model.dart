@@ -9,6 +9,7 @@ class Reading {
   final DateTime readingDate;
   final int month;
   final int year;
+  final String? notes;
 
   Reading({
     required this.id,
@@ -21,6 +22,7 @@ class Reading {
     required this.readingDate,
     required this.month,
     required this.year,
+    this.notes,
   });
 
   factory Reading.fromJson(Map<String, dynamic> json) {
@@ -35,6 +37,7 @@ class Reading {
       readingDate: DateTime.parse(json['reading_date']),
       month: json['month'],
       year: json['year'],
+      notes: json['notes'],
     );
   }
 }

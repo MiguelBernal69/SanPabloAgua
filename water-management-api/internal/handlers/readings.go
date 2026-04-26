@@ -16,6 +16,7 @@ type CreateReadingRequest struct {
 	CurrentReading float64 `json:"current_reading"`
 	Month          int     `json:"month"`
 	Year           int     `json:"year"`
+	Notes          string  `json:"notes"`
 }
 
 // CreateReading crea una nueva lectura mensual
@@ -57,9 +58,14 @@ func CreateReading(c *fiber.Ctx) error {
 		customerID, req.Month, req.Year).First(&existingReading)
 
 	if result.Error == nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Ya existe una lectura para este mes y año",
-		})
+		// ACTUALIZAR LECTURA EXISTENTE (Modo Edición)
+		existingReading.CurrentReading = req.CurrentReading
+		existingReading.Notes = req.Notes
+		existingReading.ReadingDate = time.Now()
+		existingReading.LectorID = lectorID
+		
+		// Recalcular consumo y monto contra la lectura anterior real
+		// (La lógica de obtener previousValue ya se hará abajo, así que movemos el bloque)
 	}
 
 	// Obtener la lectura anterior (mes pasado)
@@ -96,33 +102,46 @@ func CreateReading(c *fiber.Ctx) error {
 	// Calcular monto total usando el servicio de facturación
 	totalAmount := services.CalculateWaterBill(consumption)
 
-	// Crear la lectura
-	reading := models.Reading{
-		CustomerID:      customerID,
-		Month:           req.Month,
-		Year:            req.Year,
-		PreviousReading: previousValue,
-		CurrentReading:  req.CurrentReading,
-		Consumption:     consumption,
-		TotalAmount:     totalAmount,
-		IsPaid:          false,
-		ReadingDate:     time.Now(),
-		LectorID:        lectorID,
+	// Si existe, actualizamos; si no, creamos
+	if existingReading.ID != uuid.Nil {
+		existingReading.PreviousReading = previousValue
+		existingReading.Consumption = consumption
+		existingReading.TotalAmount = totalAmount
+		
+		if err := database.DB.Save(&existingReading).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Error al actualizar lectura",
+			})
+		}
+		// Cargar relaciones para la respuesta
+		database.DB.Preload("Customer.User").Preload("Lector").First(&existingReading, existingReading.ID)
+		return c.Status(fiber.StatusOK).JSON(existingReading)
+	} else {
+		// Crear la lectura nueva
+		reading := models.Reading{
+			CustomerID:      customerID,
+			Month:           req.Month,
+			Year:            req.Year,
+			PreviousReading: previousValue,
+			CurrentReading:  req.CurrentReading,
+			Consumption:     consumption,
+			TotalAmount:     totalAmount,
+			IsPaid:          false,
+			ReadingDate:     time.Now(),
+			LectorID:        lectorID,
+			Notes:           req.Notes,
+		}
+
+		if err := database.DB.Create(&reading).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Error al crear lectura",
+			})
+		}
+
+		// Cargar relaciones para la respuesta
+		database.DB.Preload("Customer.User").Preload("Lector").First(&reading, reading.ID)
+		return c.Status(fiber.StatusCreated).JSON(reading)
 	}
-
-	if err := database.DB.Create(&reading).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Error al crear lectura",
-		})
-	}
-
-	// Cargar relaciones para la respuesta
-	database.DB.Preload("Customer.User").Preload("Lector").First(&reading, reading.ID)
-
-	// TODO: Enviar notificación por email al cliente
-	// services.SendReadingNotification(customer.User.Email, reading)
-
-	return c.Status(fiber.StatusCreated).JSON(reading)
 }
 
 // GetReadings obtiene todas las lecturas con filtros opcionales

@@ -210,11 +210,18 @@ class _LectorDashboardState extends State<LectorDashboard> {
             ),
           ],
         ),
-        trailing: Icon(
-          customer.isReadThisMonth ? LucideIcons.check : LucideIcons.chevronRight, 
-          color: customer.isReadThisMonth ? Colors.greenAccent.withValues(alpha: 0.2) : const Color(0xFF64748B)
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              customer.isReadThisMonth ? LucideIcons.checkCircle : LucideIcons.chevronRight, 
+              color: customer.isReadThisMonth ? Colors.greenAccent : const Color(0xFF64748B)
+            ),
+            if (customer.isReadThisMonth)
+              const Text('EDITAR', style: TextStyle(color: Colors.greenAccent, fontSize: 8, fontWeight: FontWeight.bold)),
+          ],
         ),
-        onTap: customer.isReadThisMonth ? null : () {
+        onTap: () {
           Navigator.push(
             context,
             MaterialPageRoute(

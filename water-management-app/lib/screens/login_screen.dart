@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../services/print_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -127,6 +128,36 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     );
                   },
+                ),
+                
+                const SizedBox(height: 30),
+                
+                // Emergency Reset Button
+                Center(
+                  child: TextButton.icon(
+                    onPressed: () {
+                      PrintService.resetToHybrid((message) {
+                        if (message.isNotEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(message),
+                              duration: const Duration(seconds: 2),
+                              backgroundColor: message.contains('Error') ? Colors.redAccent : Colors.green,
+                            ),
+                          );
+                        }
+                      });
+                    },
+                    icon: const Icon(Icons.settings_backup_restore, color: Colors.blueGrey, size: 20),
+                    label: Text(
+                      'ARREGLAR IMPRESORA (RESET)',
+                      style: GoogleFonts.outfit(
+                        color: Colors.blueGrey,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),

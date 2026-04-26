@@ -66,6 +66,7 @@ type Reading struct {
 	IsPaid          bool           `gorm:"default:false" json:"is_paid"`
 	ReadingDate     time.Time      `gorm:"not null" json:"reading_date"`
 	LectorID        uuid.UUID      `gorm:"type:uuid" json:"lector_id"` // Quien tomó la lectura
+	Notes           string         `json:"notes"`
 	CreatedAt       time.Time      `json:"created_at"`
 	UpdatedAt       time.Time      `json:"updated_at"`
 	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`

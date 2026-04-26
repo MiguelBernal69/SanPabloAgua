@@ -242,7 +242,8 @@ const AdminReadings: React.FC = () => {
                 <th className="px-4 py-6">L. Actual</th>
                 <th className="px-4 py-6">Consumo</th>
                 <th className="px-4 py-6">Total Bs.</th>
-                <th className="px-4 py-6">Estado</th>
+                <th className="px-4 py-6 text-center">Estado</th>
+                <th className="px-4 py-6 text-center">Notas</th>
                 <th className="px-6 py-6 text-right">Acciones</th>
               </tr>
             </thead>
@@ -274,6 +275,11 @@ const AdminReadings: React.FC = () => {
                       {r.is_paid ? 'Pagado' : 'Pendiente'}
                     </span>
                   </td>
+                  <td className="px-4 py-5 text-center">
+                    <p className="text-[10px] text-slate-500 max-w-[120px] truncate mx-auto" title={r.notes}>
+                      {r.notes || '-'}
+                    </p>
+                  </td>
                   <td className="px-6 py-5 text-right">
                     <div className="flex items-center justify-end gap-2">
                       {!r.is_paid && (
@@ -294,7 +300,7 @@ const AdminReadings: React.FC = () => {
       {/* Detail Modal */}
       {isDetailModalOpen && selectedReading && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-[2.5rem] shadow-2xl animate-in zoom-in-95 duration-300 custom-scrollbar">
             <div className="p-8 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 rounded-2xl bg-primary-600/10 flex items-center justify-center text-primary-500 shadow-inner">
@@ -383,6 +389,18 @@ const AdminReadings: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Notes Section */}
+              {selectedReading.notes && (
+                <div className="space-y-3">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Observaciones del Lector</h3>
+                  <div className="bg-amber-500/5 border border-amber-500/20 p-5 rounded-3xl">
+                    <p className="text-sm text-amber-200/80 leading-relaxed italic">
+                      "{selectedReading.notes}"
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Status and Dates */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
